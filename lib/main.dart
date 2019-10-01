@@ -1,25 +1,40 @@
+import 'dart:math';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:scoped_model/scoped_model.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
-//  Provider.debugCheckInvalidValueType = null;
-
-  runApp(
-      ChangeNotifierProvider<MyModel>(
-        builder: (context) => MyModel(),
-        child: MyApp(),
-      )
-  );
+  runApp(ChangeNotifierProvider<ColorModel>(
+    builder: (context) => ColorModel(),
+    child: MyApp(),
+  ));
 }
-class MyModel with ChangeNotifier {
-  String _foo;
 
-  String get foo => _foo;
+class ColorModel with ChangeNotifier {
+  String name = '';
+  int r = 255;
+  int g = 255;
+  int b = 255;
 
-  void set foo(String value) {
-    _foo = value;
+  Future updateColor(int r, int g, int b) async{
+    this.name = await fetchColor(r, g, b);
+    this.r = r;
+    this.g = g;
+    this.b = b;
     notifyListeners();
+  }
+
+  Future<String> fetchColor(int r, int g, int b) async{
+    final response = await http.get('http://www.thecolorapi.com/id?rgb=rgb(${r},${g},${b})');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['name']['value'];
+    } else {
+      throw Exception('Failed to load post');
+    }
   }
 }
 
@@ -27,40 +42,51 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print('MyApp built');
-    return
-        MaterialApp(
-            home: Scaffold(
-                appBar: AppBar(),
-                body: Column(children: [
-                  Text('Hoge'),
-                  MyWidget(),
-                  OtherWidget()
-                ])
-            )
+    return MaterialApp(
+        home: Scaffold(
+            appBar: AppBar(),
+            body: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [ColorWidget(), ButtonWidget()])
+              ],
+            )));
+  }
+}
+
+class ColorWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    print('ColorWidget built');
+    return Consumer<ColorModel>(
+      builder: (context, value, child) {
+        return
+          ConstrainedBox(
+            constraints: BoxConstraints(minWidth: 100, minHeight: 100),
+            child: Container(
+                child: Center(child: Text(value.name)),
+                decoration: BoxDecoration(color: Color.fromRGBO(value.r, value.g, value.b, 1.0))
+          ),
         );
-  }
-}
-
-class MyWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    print('MyWidget built');
-    return Consumer<MyModel>(
-      builder: (context, value, child) => Text(value.foo),
-    );
-  }
-}
-
-class OtherWidget extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    print('OtherWidget built');
-    return FlatButton(
-      child: Text('Update'),
-      onPressed: () {
-        final model = Provider.of<MyModel>(context);
-        model.foo = DateTime.now().toString();
       },
     );
   }
 }
+
+class ButtonWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    print('ButtonWidget built');
+    return RaisedButton(
+      child: Text('Update'),
+      onPressed: () {
+        final model = Provider.of<ColorModel>(context);
+        model.updateColor(randomColor(), randomColor(), randomColor());
+      },
+    );
+  }
+}
+
+final randomColor = () => Random().nextInt(255);
